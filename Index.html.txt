@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AP Biology Practice Platform</title>
+
+<style>
+body { font-family: Arial; background:#f4f6f8; padding:20px; }
+.hidden { display:none; }
+button { padding:10px; margin:5px; cursor:pointer; }
+.choice { border:2px solid #ccc; padding:10px; margin:5px; cursor:pointer; }
+.choice.selected { border-color:black; }
+.choice.correct { background:#c8f7c5; }
+.choice.wrong { background:#f7c5c5; }
+textarea { width:100%; height:120px; }
+.match { border:2px solid #ccc; padding:10px; margin:5px; cursor:pointer; }
+</style>
+</head>
+
+<body>
+
+<h1>AP Biology Practice</h1>
+
+<div id="home">
+  <select id="unitSelect">
+    <option value="1">Unit 1 – Chemistry of Life</option>
+    <option value="2">Unit 2 – Cell Structure</option>
+    <option value="3">Unit 3 – Cellular Energetics</option>
+    <option value="4">Unit 4 – Cell Communication</option>
+    <option value="5">Unit 5 – Heredity</option>
+    <option value="6">Unit 6 – Gene Expression</option>
+    <option value="7">Unit 7 – Natural Selection</option>
+    <option value="8">Unit 8 – Ecology</option>
+  </select><br><br>
+
+  <button onclick="startPractice()">Practice</button>
+  <button onclick="startTest()">Test Mode</button>
+  <button onclick="startFRQ()">FRQs</button>
+  <button onclick="startMatching()">Matching</button>
+</div>
+
+<div id="practice" class="hidden">
+  <h2 id="pQ"></h2>
+  <div id="pChoices"></div>
+  <button onclick="checkPractice()">Check</button>
+  <p id="pFeedback"></p>
+  <button onclick="nextPractice()">Next</button>
+</div>
+
+<div id="test" class="hidden">
+  <h2 id="tQ"></h2>
+  <div id="tChoices"></div>
+</div>
+
+<div id="result" class="hidden"></div>
+
+<div id="frq" class="hidden">
+  <h2 id="frqPrompt"></h2>
+  <textarea></textarea>
+  <button onclick="showFRQ()">Show Sample</button>
+  <p id="frqSample"></p>
+</div>
+
+<div id="matching" class="hidden">
+  <h2>Matching</h2>
+  <div id="terms"></div>
+  <div id="defs"></div>
+  <p id="matchFeedback"></p>
+</div>
+
+<script>
+const units = {
+1: {
+mcq: Array.from({length:100},(_,i)=>({
+  q:`Unit 1 MCQ ${i+1}: Which property of water is essential for life?`,
+  c:["Polarity","High specific heat","Cohesion","Adhesion"],
+  a:1,
+  e:"Water’s high specific heat stabilizes temperature."
+})),
+frq: [
+{p:"Explain how hydrogen bonding affects water properties.",
+ s:"Hydrogen bonds cause cohesion, high specific heat, and surface tension."},
+{p:"Describe how enzymes affect reaction rates.",
+ s:"Enzymes lower activation energy by stabilizing the transition state."},
+{p:"Explain the importance of carbon’s structure.",
+ s:"Carbon forms four covalent bonds enabling complex molecules."},
+{p:"Describe protein structure levels.",
+ s:"Primary to quaternary structure determine function."},
+{p:"Explain pH effects on enzymes.",
+ s:"Extreme pH disrupts ionic and hydrogen bonds."}
+],
+match:[
+["Cohesion","Water molecules stick together"],
+["Adhesion","Water sticks to other surfaces"],
+["Enzyme","Biological catalyst"],
+["pH","Measure of acidity"],
+["Monomer","Building block"]
+]
+}
+};
+
+/* PRACTICE */
+let pi=0,sel=null;
+function startPractice(){hideAll();practice.classList.remove("hidden");pi=0;loadP();}
+function loadP(){
+const q=units[unitSelect.value].mcq[pi];
+pQ.textContent=q.q; pChoices.innerHTML=""; pFeedback.textContent="";
+q.c.forEach((c,i)=>{
+let d=document.createElement("div");
+d.className="choice"; d.textContent=c;
+d.onclick=()=>{document.querySelectorAll(".choice").forEach(x=>x.classList.remove("selected"));d.classList.add("selected");sel=i;}
+pChoices.appendChild(d);
+});
+}
+function checkPractice(){
+const q=units[unitSelect.value].mcq[pi];
+document.querySelectorAll(".choice").forEach((d,i)=>{
+if(i===q.a)d.classList.add("correct");
+if(i===sel&&i!==q.a)d.classList.add("wrong");
+});
+pFeedback.textContent=sel===q.a?"Correct!":"Incorrect: "+q.e;
+}
+function nextPractice(){pi++; if(pi<100)loadP();}
+
+/* TEST */
+let ti=0,score=0;
+function startTest(){hideAll();test.classList.remove("hidden");ti=0;score=0;loadT();}
+function loadT(){
+const q=units[unitSelect.value].mcq[ti];
+tQ.textContent=q.q; tChoices.innerHTML="";
+q.c.forEach((c,i)=>{
+let d=document.createElement("div");
+d.className="choice"; d.textContent=c;
+d.onclick=()=>{if(i===q.a)score++;ti++;ti<20?loadT():endTest();}
+tChoices.appendChild(d);
+});
+}
+function endTest(){
+hideAll();
+result.classList.remove("hidden");
+result.innerHTML=`<h2>Score: ${score}/20</h2>`;
+}
+
+/* FRQ */
+let fi=0;
+function startFRQ(){hideAll();frq.classList.remove("hidden");fi=0;loadFRQ();}
+function loadFRQ(){
+frqPrompt.textContent=units[unitSelect.value].frq[fi].p;
+frqSample.textContent="";
+}
+function showFRQ(){
+frqSample.textContent=units[unitSelect.value].frq[fi].s;
+}
+
+/* MATCHING */
+let pick=null;
+function startMatching(){
+hideAll();matching.classList.remove("hidden");
+terms.innerHTML="";defs.innerHTML="";matchFeedback.textContent="";
+units[unitSelect.value].match.forEach(p=>{
+let t=document.createElement("div");
+t.className="match";t.textContent=p[0];t.onclick=()=>pick=p[1];
+terms.appendChild(t);
+let d=document.createElement("div");
+d.className="match";d.textContent=p[1];
+d.onclick=()=>matchFeedback.textContent=d.textContent===pick?"Correct!":"Try again";
+defs.appendChild(d);
+});
+}
+
+function hideAll(){
+home.classList.add("hidden");
+practice.classList.add("hidden");
+test.classList.add("hidden");
+result.classList.add("hidden");
+frq.classList.add("hidden");
+matching.classList.add("hidden");
+}
+</script>
+
+</body>
+</html>
