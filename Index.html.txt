@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AP Biology Practice</title>
+<style>
+body { font-family: Arial; margin:0; padding:0; display:flex; flex-direction:column; align-items:center; background:#1b0033; color:white; }
+h1,h2 { text-align:center; margin:10px; }
+button { padding:10px 20px; margin:10px; cursor:pointer; border:none; border-radius:5px; background:#4b0082; color:white; }
+button:hover { background:#6a1aff; }
+#home { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
+.choice { border:2px solid #fff; padding:10px; margin:5px 0; cursor:pointer; border-radius:5px; width:300px; text-align:center; }
+.choice.correct { background: #00ff00; color:black; }
+.choice.wrong { background: #ff4d4d; color:black; }
+textarea { width:400px; height:120px; margin-top:10px; background:#333; color:white; border:none; padding:10px; border-radius:5px; }
+#practice, #frq, #mixed { display:none; flex-direction:column; align-items:center; margin-top:20px; }
+p.explanation { margin-top:10px; width:400px; text-align:left; color:#ffdd99; }
+p.feedback { margin-top:10px; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<div id="home">
+  <h1>AP Biology Practice</h1>
+  <label>Select Unit:</label>
+  <select id="unitSelect">
+    <option value="1">Unit 1 – Chemistry of Life</option>
+    <option value="2">Unit 2 – Cell Structure</option>
+    <option value="3">Unit 3 – Cellular Energetics</option>
+  </select>
+  <button id="mcqBtn">MCQ Practice</button>
+  <button id="frqBtn">FRQ Practice</button>
+  <button id="mixedBtn">Mixed Test Mode</button>
+</div>
+
+<div id="practice">
+  <h2 id="mcqQ"></h2>
+  <div id="mcqChoices"></div>
+  <p class="feedback" id="mcqFeedback"></p>
+  <p class="explanation" id="mcqExplanation"></p>
+  <button onclick="nextMCQ()">Next Question</button>
+  <button onclick="goHome()">Home</button>
+</div>
+
+<div id="frq">
+  <h2 id="frqQ"></h2>
+  <textarea id="frqAnswer" placeholder="Write your answer here..."></textarea><br>
+  <button onclick="submitFRQ()">Submit Answer</button>
+  <p class="feedback" id="frqFeedback"></p>
+  <p class="explanation" id="frqExplanation"></p>
+  <button onclick="nextFRQ()">Next Question</button>
+  <button onclick="goHome()">Home</button>
+</div>
+
+<div id="mixed">
+  <h2 id="mixedQ"></h2>
+  <div id="mixedChoices"></div>
+  <textarea id="mixedAnswer" placeholder="Write your answer here..." style="display:none;"></textarea><br>
+  <button id="mixedSubmit" onclick="submitMixed()">Submit Answer</button>
+  <p class="feedback" id="mixedFeedback"></p>
+  <p class="explanation" id="mixedExplanation"></p>
+  <button onclick="nextMixed()">Next Question</button>
+  <button onclick="goHome()">Home</button>
+</div>
+
+<script>
+window.onload = function() {
+  // BUTTONS
+  document.getElementById("mcqBtn").addEventListener("click", showMCQ);
+  document.getElementById("frqBtn").addEventListener("click", showFRQ);
+  document.getElementById("mixedBtn").addEventListener("click", showMixed);
+
+  // GLOBAL VARIABLES
+  let mcqIndex=0, frqIndex=0, mixedIndex=0, selectedAnswer=null;
+  let attemptedMCQs=new Set(), attemptedFRQs=new Set(), mixedQueue=[];
+
+  // QUESTION BANK (25 MCQ + 3 FRQ per unit can be filled in fully)
+  const units = {
+    1:{mcq:[
+      {q:"Which element is most abundant in organic molecules?", c:["Oxygen","Carbon","Hydrogen","Nitrogen"], a:1, e:"Carbon forms the backbone of organic molecules."},
+      {q:"Primary role of carbohydrates in cells?", c:["Energy storage","Information storage","Structural support","Catalysis"], a:0, e:"Carbohydrates mainly store energy."},
+      {q:"Functional group in amino acids?", c:["Carboxyl","Hydroxyl","Phosphate","Methyl"], a:0, e:"Amino acids have a carboxyl (-COOH) group."},
+      {q:"Bond holding water molecules together?", c:["Ionic","Covalent","Hydrogen","Peptide"], a:2, e:"Hydrogen bonds connect water molecules."},
+      {q:"Macromolecule containing genetic info?", c:["Protein","Carbohydrate","Nucleic acid","Lipid"], a:2, e:"DNA and RNA are nucleic acids."}
+    ],
+    frq:[
+      {q:"Explain how water's structure contributes to life.", s:"Water is polar, forms H-bonds, high heat capacity, cohesion/adhesion aid life.", rubric:6},
+      {q:"Describe the role of enzymes in chemical reactions.", s:"Enzymes lower activation energy, have specific active sites, and are affected by temperature/pH.", rubric:6},
+      {q:"Compare DNA and RNA structure and function.", s:"DNA double-stranded stores genetic info; RNA single-stranded used in transcription/translation; both made of nucleotides.", rubric:6}
+    ]},
+    2:{mcq:[
+      {q:"Organelle producing ATP?", c:["Nucleus","Mitochondria","Ribosome","Golgi"], a:1, e:"Mitochondria produce ATP via respiration."},
+      {q:"Structure controlling entry/exit?", c:["Cell membrane","Ribosome","Nucleus","Lysosome"], a:0, e:"Cell membrane regulates transport."},
+      {q:"Organelle for protein synthesis?", c:["Mitochondria","Ribosome","Lysosome","Chloroplast"], a:1, e:"Ribosomes synthesize proteins."}
+    ],
+    frq:[
+      {q:"Describe Golgi apparatus structure and function.", s:"Golgi modifies, sorts, and packages proteins/lipids for secretion or organelle use.", rubric:6},
+      {q:"Explain how lysosomes maintain cellular homeostasis.", s:"Lysosomes digest macromolecules and damaged organelles, recycling components.", rubric:6},
+      {q:"Describe mitochondria function.", s:"Mitochondria produce ATP via cellular respiration and contain their own DNA.", rubric:6}
+    ]},
+    3:{mcq:[
+      {q:"Process converting glucose into ATP?", c:["Photosynthesis","Cellular respiration","Fermentation","Transcription"], a:1, e:"Cellular respiration converts glucose to ATP."},
+      {q:"Stage producing most ATP?", c:["Glycolysis","Krebs cycle","ETC","Fermentation"], a:2, e:"Electron transport chain generates most ATP."},
+      {q:"Molecule carrying electrons to ETC?", c:["ATP","NADH","ADP","Glucose"], a:1, e:"NADH donates electrons to ETC."}
+    ],
+    frq:[
+      {q:"Explain stages of cellular respiration and ATP production.", s:"Glycolysis in cytoplasm, Krebs in mitochondria, ETC in inner mitochondrial membrane; ATP by substrate-level & oxidative phosphorylation.", rubric:6},
+      {q:"Describe NADH and FADH2 roles in respiration.", s:"They carry electrons from glycolysis/Krebs to ETC where ATP is produced.", rubric:6},
+      {q:"Compare aerobic and anaerobic respiration.", s:"Aerobic uses O2 and produces ~36 ATP; anaerobic uses alternative acceptors and produces 2 ATP.", rubric:6}
+    ]}
+  };
+
+  // ----------------- NAVIGATION -----------------
+  function goHome(){
+    document.getElementById("home").style.display="flex";
+    document.getElementById("practice").style.display="none";
+    document.getElementById("frq").style.display="none";
+    document.getElementById("mixed").style.display="none";
+  }
+  window.goHome = goHome;
+
+  function showMCQ(){document.getElementById("home").style.display="none"; document.getElementById("practice").style.display="flex"; mcqIndex=0; attemptedMCQs.clear(); shuffleMCQs(); loadMCQ();}
+  function showFRQ(){document.getElementById("home").style.display="none"; document.getElementById("frq").style.display="flex"; frqIndex=0; shuffleFRQs(); loadFRQ();}
+  function showMixed(){document.getElementById("home").style.display="none"; document.getElementById("mixed").style.display="flex"; mixedIndex=0; setupMixedQueue(); loadMixed();}
+  window.showMCQ = showMCQ; window.showFRQ = showFRQ; window.showMixed = showMixed;
+
+  // ----------------- MCQ -----------------
+  function shuffleMCQs(){units[document.getElementById("unitSelect").value].mcq.sort(()=>Math.random()-0.5);}
+  function loadMCQ(){
+    let unit=units[document.getElementById("unitSelect").value]; if(mcqIndex>=unit.mcq.length){alert("End of MCQs"); mcqIndex=0; return;}
+    const q=unit.mcq[mcqIndex]; if(attemptedMCQs.has(mcqIndex)){mcqIndex++; loadMCQ(); return;}
+    document.getElementById("mcqQ").textContent=q.q; let container=document.getElementById("mcqChoices"); container.innerHTML=""; selectedAnswer=null;
+    document.getElementById("mcqFeedback").textContent=""; document.getElementById("mcqExplanation").textContent="";
+    q.c.forEach((c,i)=>{let div=document.createElement("div"); div.className="choice"; div.textContent=c; div.onclick=()=>{if(selectedAnswer===null){selectedAnswer=i; checkMCQ(q,i); attemptedMCQs.add(mcqIndex);}}; container.appendChild(div);});
+  }
+  function checkMCQ(q,i){
+    document.querySelectorAll("#mcqChoices .choice").forEach((d,idx)=>{if(idx===q.a)d.classList.add("correct"); if(idx===i && i!==q.a)d.classList.add("wrong");});
+    document.getElementById("mcqFeedback").textContent=i===q.a?"Correct!":"Incorrect.";
+    document.getElementById("mcqExplanation").textContent=q.e;
+  }
+  function nextMCQ(){mcqIndex++; loadMCQ();}
+
+  // ----------------- FRQ -----------------
+  function shuffleFRQs(){units[document.getElementById("unitSelect").value].frq.sort(()=>Math.random()-0.5);}
+  function loadFRQ(){
+    let unit=units[document.getElementById("unitSelect").value]; const q=unit.frq[frqIndex];
+    document.getElementById("frqQ").textContent=q.q;
+    document.getElementById("frqAnswer").value=""; document.getElementById("frqFeedback").textContent=""; document.getElementById("frqExplanation").textContent="";
+  }
+  function submitFRQ(){
+    let unit=units[document.getElementById("unitSelect").value]; const q=unit.frq[frqIndex];
+    let answer=document.getElementById("frqAnswer").value.toLowerCase();
+    let points=0;
+    if(answer.includes(q.s.split(' ')[0].toLowerCase())) points=q.rubric;
+    document.getElementById("frqFeedback").textContent=`Score: ${points}/${q.rubric}`;
+    if(points<q.rubric) document.getElementById("frqExplanation").textContent=`Correct answer: ${q.s}`;
+  }
+  function nextFRQ(){frqIndex++; let unit=units[document.getElementById("unitSelect").value); if(frqIndex>=unit.frq.length){alert("End of FRQs"); frqIndex=0;} loadFRQ();}
+
+  // ----------------- MIXED -----------------
+  function setupMixedQueue(){let unit=units[document.getElementById("unitSelect").value]; mixedQueue=[...unit.mcq,...unit.frq]; mixedQueue.sort(()=>Math.random()-0.5);}
+  function loadMixed(){
+    const q=mixedQueue[mixedIndex]; document.getElementById("mixedQ").textContent=q.q;
+    document.getElementById("mixedChoices").innerHTML=""; document.getElementById("mixedAnswer").style.display="none"; document.getElementById("mixedSubmit").style.display="inline-block";
+    document.getElementById("mixedFeedback").textContent=""; document.getElementById("mixedExplanation").textContent=""; selectedAnswer=null;
+    if(q.c){q.c.forEach((c,i)=>{let div=document.createElement("div"); div.className="choice"; div.textContent=c; div.onclick=()=>{if(selectedAnswer===null){selectedAnswer=i; checkMixedMCQ(q,i);}}; document.getElementById("mixedChoices").appendChild(div); document.getElementById("mixedSubmit").style.display="none";});}
+    else{document.getElementById("mixedAnswer").style.display="block";}
+  }
+  function checkMixedMCQ(q,i){document.querySelectorAll("#mixedChoices .choice").forEach((d,idx)=>{if(idx===q.a)d.classList.add("correct"); if(idx===i && i!==q.a)d.classList.add("wrong");}); document.getElementById("mixedFeedback").textContent=i===q.a?"Correct!":"Incorrect."; document.getElementById("mixedExplanation").textContent=q.e;}
+  function submitMixed(){const q=mixedQueue[mixedIndex]; let answer=document.getElementById("mixedAnswer").value.toLowerCase(); let points=0; if(answer.includes(q.s.split(' ')[0].toLowerCase())) points=q.rubric; document.getElementById("mixedFeedback").textContent=`Score: ${points}/${q.rubric}`; if(points<q.rubric) document.getElementById("mixedExplanation").textContent=`Correct answer: ${q.s}`;}
+  function nextMixed(){mixedIndex++; selectedAnswer=null; if(mixedIndex>=mixedQueue.length){alert("End of test"); mixedIndex=0;} loadMixed();}
+}
+</script>
+
+</body>
+</html>
